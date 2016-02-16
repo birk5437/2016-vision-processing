@@ -211,41 +211,124 @@ int main(int argc, const char* argv[])
 				findContours(thresholded, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 
-				cout << contours.size() << " contours" << endl;
+				if (contours.size() > 0) {
 
-				vector <Point> targetContour = contours[0];
-				int whichContour = 0;
+					cout << contours.size() << " contours" << endl;
 
-				for (int i = 1; i < contours.size(); i++) {
-					if (contourArea(contours[i]) > contourArea(targetContour)) {
-						targetContour = contours[i];
-						whichContour = i;
+					vector <Point> targetContour = contours[0];
+					int whichContour = 0;
+
+					for (int i = 1; i < contours.size(); i++) {
+						if (contourArea(contours[i]) > contourArea(targetContour)) {
+							targetContour = contours[i];
+							whichContour = i;
+						}
 					}
+
+					cout << "set targetContour" << endl;
+
+					Mat drawing = Mat::zeros( thresholded.size(), CV_8UC3 );
+					Scalar color = Scalar( 255, 255, 255);
+
+					cout << "drew targetContour" << endl;
+
+					// find the extents of each contour
+
+					vector <Point> hull;
+
+					convexHull(targetContour, hull, false);
+
+					vector <vector <Point> > tmpHull(1, hull);
+
+					drawContours(drawing, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
+
+					cout << "hull size" << hull.size() << endl;
+
+
+					vector <Point> corners(4, Point(0,0));
+					vector <int>  cornerSq(4);
+					int TOP_LEFT = 0;
+					int TOP_RIGHT = 1;
+					int BOTTOM_RIGHT = 2;
+					int BOTTOM_LEFT = 3;
+
+					for (unsigned int i = 0; i < corners.size(); i++) {
+						corners[i] = hull[0];
+						if (i < 2)
+						  cornerSq[i] = hull[0].x * hull[0].y;
+						else
+						  cornerSq[i] = (img.cols - hull[0].x) * hull[0].y;
+					}
+
+					cout << "hull " << "0" << ": (" << hull[0].x << ", " << hull[0].y << ") ";
+
+
+					for (unsigned int i = 1; i < hull.size(); i++) {
+
+						cout << "hull " << i << ": (" << hull[i].x << ", " << hull[i].y << ") ";
+						int thisSq = hull[i].x * hull[i].y;
+
+						if (thisSq < cornerSq[TOP_LEFT]) {
+							corners[TOP_LEFT] = hull[i];
+							cornerSq[TOP_LEFT] = thisSq;
+						}
+						if (thisSq > cornerSq[BOTTOM_RIGHT]) {
+							corners[BOTTOM_RIGHT] = hull[i];
+							cornerSq[BOTTOM_RIGHT] = thisSq;
+						}
+
+						thisSq = (img.cols - hull[i].x) * hull[i].y;
+
+						if (thisSq < cornerSq[TOP_RIGHT]) {
+							corners[TOP_RIGHT] = hull[i];
+							cornerSq[TOP_RIGHT] = thisSq;
+						}
+						if (thisSq > cornerSq[BOTTOM_LEFT]) {
+							corners[BOTTOM_LEFT] = hull[i];
+							cornerSq[BOTTOM_LEFT] = thisSq;
+						}
+					}
+
+					cout << endl;
+
+					for (unsigned int i = 0; i < corners.size(); i++) {
+						cout << "corner " << i << ": (" << corners[i].x << ", " << corners[i].y << ")" << endl;
+					}
+
+
+					for (unsigned int i = 0; i < corners.size(); i++) {
+						circle(drawing, corners[i], 4, Scalar(0, 0, 255), 1, 8, 0);
+					}
+
+					//Easier equations that will average out the points
+					double cenX1 = fabs(((double)(corners[TOP_RIGHT].x - corners[TOP_LEFT].x)) / 2);
+					double cenX2 = fabs(((double)(corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x)) / 2);
+					double cenX = ((double) (cenX1 + cenX2) / 2) + corners[TOP_LEFT].x;
+
+					double cenY1 = fabs(((double)(corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y)) / 2);
+					double cenY2 = fabs(((double)(corners[TOP_LEFT].y - corners[BOTTOM_LEFT].y)) / 2);
+					double cenY = ((double) (cenY1 + cenY2) / 2) + corners[TOP_LEFT].y;
+
+					//Complicated method
+					///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//					double sL = ((double) corners[BOTTOM_RIGHT].y - corners[TOP_LEFT].y) / ((double) corners[BOTTOM_RIGHT].x - corners[TOP_LEFT].x);
+//					double sR = ((double) corners[BOTTOM_LEFT].y - corners[TOP_RIGHT].y) / ((double) corners[BOTTOM_LEFT].x - corners[TOP_RIGHT].x);
+//
+//					double cenX = ((double) (-sL * corners[TOP_LEFT].x) - corners[TOP_LEFT].y + (sR * corners[TOP_RIGHT].x) + corners[TOP_RIGHT].y) / ((double) sR - sL);
+//
+//					double cenY = -((double) (sR * cenX) - (sR * corners[TOP_RIGHT].x) - corners[TOP_RIGHT].y);
+					/////////////////////////////////////////////////////////////////////////////////////////
+
+					cout << "(easy) CenX: " << cenX << endl;
+					cout << "(easy) CenY: " << cenY << endl;
+
+					circle(drawing, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
+
+					line(drawing, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
+					line(drawing, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
+
+					imwrite("/var/local/natinst/www/capture.png", drawing);
 				}
-
-				cout << "set targetContour" << endl;
-
-				Mat drawing = Mat::zeros( thresholded.size(), CV_8UC3 );
-				Scalar color = Scalar( 255, 255, 255);
-				drawContours(drawing, contours, whichContour, color, 1, 8, hierarchy, 0, Point(0, 0) );
-
-				cout << "drew targetContour" << endl;
-
-				  // find the extents of each contour
-
-				  vector <Point> hull;
-
-				  convexHull(targetContour, hull, false);
-
-
-
-				  cout << "hull size" << hull.size() << endl;
-
-//				HoughLinesP(tresholded, lines, 1, CV_PI/180, 70, 30, 10);
-
-
-				imwrite("/var/local/natinst/www/capture.png", drawing);
-
 				//Lock Targets and determine goals
 				pthread_mutex_lock(&targetMutex);
 //				findTarget(img, thresholded, targets, params);
