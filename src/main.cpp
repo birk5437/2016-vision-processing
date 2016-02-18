@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 #include <sstream>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <networktables/NetworkTable.h>
 using namespace cv;
 using namespace std;
 
