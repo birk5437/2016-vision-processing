@@ -61,7 +61,7 @@ struct ProgParams
 	bool USB_Cam;
 };
 
-//Stuct to hold information about targets found
+//Struct to hold information about targets found
 struct Target
 {
 	Rect HorizontalTarget;
@@ -216,12 +216,10 @@ int main(int argc, const char* argv[])
 					cout << contours.size() << " contours" << endl;
 
 					vector <Point> targetContour = contours[0];
-					int whichContour = 0;
 
-					for (int i = 1; i < contours.size(); i++) {
+					for (unsigned int i = 1; i < contours.size(); i++) {
 						if (contourArea(contours[i]) > contourArea(targetContour)) {
 							targetContour = contours[i];
-							whichContour = i;
 						}
 					}
 
@@ -328,6 +326,8 @@ int main(int argc, const char* argv[])
 					line(drawing, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
 
 					imwrite("/var/local/natinst/www/capture.png", drawing);
+				} else {
+					cout << "can't find contours" << endl;
 				}
 				//Lock Targets and determine goals
 				pthread_mutex_lock(&targetMutex);
@@ -859,6 +859,8 @@ void *VideoCap(void *args)
 			vcap.set(CV_CAP_PROP_EXPOSURE_ABSOLUTE, 0.1);
 			vcap.set(CV_CAP_PROP_BRIGHTNESS, 1);
 			vcap.set(CV_CAP_PROP_CONTRAST, 0);
+			vcap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+			vcap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
 			cout<<vcap.get(CV_CAP_PROP_FRAME_WIDTH)<<endl;
 			cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
