@@ -166,6 +166,15 @@ int main(int argc, const char* argv[])
 	ProgParams params;
 	parseCommandInputs(argc, argv, params);
 
+
+	// setup Network tables for this client to talk to the java code (same place this code is running!)
+	NetworkTable::SetClientMode();
+	NetworkTable::SetIPAddress("10.36.18.2"); // where is the robot?
+	NetworkTable *table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
+
+	cout << "Got through the network tables\n";
+
+
 	//start mjpeg stream thread
 	pthread_create(&MJPEG, NULL, VideoCap, &params);
 
@@ -319,6 +328,9 @@ int main(int argc, const char* argv[])
 
 					cout << "(easy) CenX: " << cenX << endl;
 					cout << "(easy) CenY: " << cenY << endl;
+
+					table->PutNumber("Center X", cenX);
+					table->PutNumber("Center Y", cenY);
 
 					circle(drawing, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
 
