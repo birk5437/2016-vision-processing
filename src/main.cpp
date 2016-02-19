@@ -169,8 +169,8 @@ int main(int argc, const char* argv[])
 
 	// setup Network tables for this client to talk to the java code (same place this code is running!)
 	NetworkTable::SetClientMode();
-	NetworkTable::SetIPAddress("10.36.18.2"); // where is the robot?
-	NetworkTable *table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
+	NetworkTable::SetIPAddress("10.36.18.22"); // where is the robot?
+	std::shared_ptr<NetworkTable> table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
 
 	cout << "Got through the network tables\n";
 
