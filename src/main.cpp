@@ -340,6 +340,13 @@ int main(int argc, const char* argv[])
 					for (unsigned int i = 0; i < 4; i++) {
 						circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
 					}
+
+					double w1 = fabs((double)corners[TOP_RIGHT].x - (double)corners[TOP_LEFT].x);
+					double w2 = fabs((double)corners[BOTTOM_RIGHT].x - (double)corners[BOTTOM_LEFT].x);
+					double w = ((w1 + w2)/(double)2);
+
+					table->PutNumber("Goal Width", w);
+
 					imwrite("/var/local/natinst/www/capture.png", drawing);
 				} else {
 					cout << "can't find contours" << endl;
