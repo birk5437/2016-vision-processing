@@ -203,15 +203,12 @@ int main(int argc, const char* argv[])
 			clock_gettime(CLOCK_REALTIME, &start);
 
 			pthread_mutex_lock(&frameMutex);
-			if (!frame.empty())
-			{
+			if (!frame.empty()){
 				frame.copyTo(img);
 				pthread_mutex_unlock(&frameMutex);
 
 				thresholded = ThresholdImage(img);
 
-//				imwrite("/var/local/natinst/www/capture.png", thresholded);
-				imwrite("/var/local/natinst/www/capture-src.png", img);
 
 				vector < vector<Point> > contours;
 				vector<Vec4i> hierarchy;
@@ -247,7 +244,6 @@ int main(int argc, const char* argv[])
 
 					vector <vector <Point> > tmpHull(1, hull);
 
-					drawContours(drawing, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
 
 					cout << "hull size" << hull.size() << endl;
 
@@ -332,15 +328,29 @@ int main(int argc, const char* argv[])
 					table->PutNumber("Center X", cenX);
 					table->PutNumber("Center Y", cenY);
 
+					drawContours(drawing, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
 					circle(drawing, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
-
 					line(drawing, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
 					line(drawing, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
 
+					drawContours(img, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
+					circle(img, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
+					line(img, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
+					line(img, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
+					for (unsigned int i = 0; i < 4; i++) {
+						circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
+					}
 					imwrite("/var/local/natinst/www/capture.png", drawing);
 				} else {
 					cout << "can't find contours" << endl;
+					int NO_CONTOURS = -1;
+					table->PutNumber("Center X", NO_CONTOURS);
+					table->PutNumber("Center Y", NO_CONTOURS);
 				}
+
+				imwrite("/var/local/natinst/www/capture-src.png", img);
+
+
 				//Lock Targets and determine goals
 				pthread_mutex_lock(&targetMutex);
 //				findTarget(img, thresholded, targets, params);
@@ -507,7 +517,6 @@ void findTarget(Mat original, Mat thresholded, Target& targets, const ProgParams
 	vector<RotatedRect> minRect(contours.size());
 
 	/// Draw contours
-	Mat drawing = Mat::zeros(original.size(), CV_8UC3);
 
 	NullTargets(targets);
 
