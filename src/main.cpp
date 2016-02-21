@@ -209,6 +209,7 @@ int main(int argc, const char* argv[])
 
 				thresholded = ThresholdImage(img);
 
+				imwrite("/var/local/natinst/www/capture-src.png", img);
 
 				vector < vector<Point> > contours;
 				vector<Vec4i> hierarchy;
@@ -341,11 +342,14 @@ int main(int argc, const char* argv[])
 						circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
 					}
 
-					double w1 = fabs((double)corners[TOP_RIGHT].x - (double)corners[TOP_LEFT].x);
-					double w2 = fabs((double)corners[BOTTOM_RIGHT].x - (double)corners[BOTTOM_LEFT].x);
-					double w = ((w1 + w2)/(double)2);
+					double x = corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x;
+					double y = corners[BOTTOM_RIGHT].y - corners[BOTTOM_LEFT].y;
+					double x2 = pow(x, 2);
+					double y2 = pow(y, 2);
 
-					table->PutNumber("Goal Width", w);
+					double dist = sqrt(x2 + y2);
+
+					table->PutNumber("Goal Width", dist);
 
 					imwrite("/var/local/natinst/www/capture.png", drawing);
 				} else {
@@ -355,7 +359,7 @@ int main(int argc, const char* argv[])
 					table->PutNumber("Center Y", NO_CONTOURS);
 				}
 
-				imwrite("/var/local/natinst/www/capture-src.png", img);
+				imwrite("/var/local/natinst/www/capture-test.png", img);
 
 
 				//Lock Targets and determine goals
