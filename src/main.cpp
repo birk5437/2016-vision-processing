@@ -230,12 +230,12 @@ int main(int argc, const char* argv[])
 						}
 					}
 
-					cout << "set targetContour" << endl;
+//					cout << "set targetContour" << endl;
 
 					Mat drawing = Mat::zeros( thresholded.size(), CV_8UC3 );
 					Scalar color = Scalar( 255, 255, 255);
 
-					cout << "drew targetContour" << endl;
+//					cout << "drew targetContour" << endl;
 
 					// find the extents of each contour
 
@@ -246,7 +246,7 @@ int main(int argc, const char* argv[])
 					vector <vector <Point> > tmpHull(1, hull);
 
 
-					cout << "hull size" << hull.size() << endl;
+					cout << "hull size " << hull.size() << endl;
 
 
 					vector <Point> corners(4, Point(0,0));
@@ -264,7 +264,7 @@ int main(int argc, const char* argv[])
 						  cornerSq[i] = (img.cols - hull[0].x) * hull[0].y;
 					}
 
-					cout << "hull " << "0" << ": (" << hull[0].x << ", " << hull[0].y << ") ";
+//					cout << "hull " << "0" << ": (" << hull[0].x << ", " << hull[0].y << ") ";
 
 
 					for (unsigned int i = 1; i < hull.size(); i++) {
@@ -295,9 +295,9 @@ int main(int argc, const char* argv[])
 
 					cout << endl;
 
-					for (unsigned int i = 0; i < corners.size(); i++) {
-						cout << "corner " << i << ": (" << corners[i].x << ", " << corners[i].y << ")" << endl;
-					}
+//					for (unsigned int i = 0; i < corners.size(); i++) {
+//						cout << "corner " << i << ": (" << corners[i].x << ", " << corners[i].y << ")" << endl;
+//					}
 
 
 					for (unsigned int i = 0; i < corners.size(); i++) {
@@ -313,18 +313,32 @@ int main(int argc, const char* argv[])
 					double cenY2 = fabs(((double)(corners[TOP_LEFT].y - corners[BOTTOM_LEFT].y)) / 2);
 					double cenY = ((double) (cenY1 + cenY2) / 2) + corners[TOP_LEFT].y;
 
-					//Complicated method
-					///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//					double sL = ((double) corners[BOTTOM_RIGHT].y - corners[TOP_LEFT].y) / ((double) corners[BOTTOM_RIGHT].x - corners[TOP_LEFT].x);
-//					double sR = ((double) corners[BOTTOM_LEFT].y - corners[TOP_RIGHT].y) / ((double) corners[BOTTOM_LEFT].x - corners[TOP_RIGHT].x);
-//
-//					double cenX = ((double) (-sL * corners[TOP_LEFT].x) - corners[TOP_LEFT].y + (sR * corners[TOP_RIGHT].x) + corners[TOP_RIGHT].y) / ((double) sR - sL);
-//
-//					double cenY = -((double) (sR * cenX) - (sR * corners[TOP_RIGHT].x) - corners[TOP_RIGHT].y);
-					/////////////////////////////////////////////////////////////////////////////////////////
+					//Code to calculate area, and eliminate the smallest contours
 
-					cout << "(easy) CenX: " << cenX << endl;
-					cout << "(easy) CenY: " << cenY << endl;
+					double wx1 = corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x;
+					double wy1 = corners[BOTTOM_RIGHT].y - corners[BOTTOM_LEFT].y;
+
+					double hx1 = corners[TOP_RIGHT].x - corners[BOTTOM_RIGHT].x;
+					double hy1 = corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y;
+
+					double wx2 = pow(wx1, 2);
+					double wy2 = pow(wy1, 2);
+
+					double hx2 = pow(hx1, 2);
+					double hy2 = pow(hy1, 2);
+
+					double dist1 = sqrt(wx2 + wy2);
+					double dist2 = sqrt(hx2 + hy2);
+
+					double area = dist1 * dist2;
+
+					cout << "Area: " << area << endl;
+
+					if (area < 99) {
+						// Do something here
+					}
+
+					table->PutNumber("Goal Width", dist1);
 
 					table->PutNumber("Center X", cenX);
 					table->PutNumber("Center Y", cenY);
@@ -341,15 +355,6 @@ int main(int argc, const char* argv[])
 					for (unsigned int i = 0; i < 4; i++) {
 						circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
 					}
-
-					double x = corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x;
-					double y = corners[BOTTOM_RIGHT].y - corners[BOTTOM_LEFT].y;
-					double x2 = pow(x, 2);
-					double y2 = pow(y, 2);
-
-					double dist = sqrt(x2 + y2);
-
-					table->PutNumber("Goal Width", dist);
 
 					imwrite("/var/local/natinst/www/capture.png", drawing);
 				} else {
@@ -646,10 +651,10 @@ Mat ThresholdImage(Mat original)
 	int iLowH = 50;
 	int iHighH = 100;
 
-	int iLowS = 150;
+	int iLowS = 100;
 	int iHighS = 255;
 
-	int iLowV = 40;
+	int iLowV = 25;
 	int iHighV = 255;
 
 	Mat imgThresholded, imgHSV;
