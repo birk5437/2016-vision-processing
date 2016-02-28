@@ -651,10 +651,10 @@ Mat ThresholdImage(Mat original)
 	int iLowH = 50;
 	int iHighH = 100;
 
-	int iLowS = 100;
+	int iLowS = 80;
 	int iHighS = 255;
 
-	int iLowV = 25;
+	int iLowV = 60;
 	int iHighV = 255;
 
 	Mat imgThresholded, imgHSV;
