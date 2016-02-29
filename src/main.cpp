@@ -105,7 +105,7 @@ struct timespec autoStart, autoEnd;
 
 //Control process thread exectution
 bool progRun;
-
+std::shared_ptr<NetworkTable> table;
 int main(int argc, const char* argv[])
 {
 
@@ -125,13 +125,17 @@ int main(int argc, const char* argv[])
 	}
 
 	NetworkTable::SetIPAddress(networktables_ip); // where is the robot?
-	std::shared_ptr<NetworkTable> table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
+	 table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
 
 	cout << "Got through the network tables\n";
 
 	//start mjpeg stream thread
-	pthread_create(&MJPEG, NULL, VideoCap, &params);
-
+    table.GetNumber("Low Hue", 50);
+    table.GetNumber("High Hue", 100);
+    table.GetNumber("Low Saturation", 80);
+    table.GetNumber("High Saturation", 255);
+    table.GetNumber("Low Value", 60);
+    table.GetNumber("High Value", 255);
 	//Create Local Processing Image Variables
 	Mat img, thresholded, output;
 
@@ -336,15 +340,6 @@ int main(int argc, const char* argv[])
 
 Mat ThresholdImage(Mat original)
 {
-
-	int iLowH = 50;
-	int iHighH = 100;
-
-	int iLowS = 80;
-	int iHighS = 255;
-
-	int iLowV = 60;
-	int iHighV = 255;
 
 	Mat imgThresholded, imgHSV;
 
