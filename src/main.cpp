@@ -130,12 +130,12 @@ int main(int argc, const char* argv[])
 	cout << "Got through the network tables\n";
 
 	//start mjpeg stream thread
-    table.GetNumber("Low Hue", 50);
-    table.GetNumber("High Hue", 100);
-    table.GetNumber("Low Saturation", 80);
-    table.GetNumber("High Saturation", 255);
-    table.GetNumber("Low Value", 60);
-    table.GetNumber("High Value", 255);
+    table->PutNumber("Low Hue", 50);
+    table->PutNumber("High Hue", 100);
+    table->PutNumber("Low Saturation", 80);
+    table->PutNumber("High Saturation", 255);
+    table->PutNumber("Low Value", 60);
+    table->PutNumber("High Value", 255);
 	//Create Local Processing Image Variables
 	Mat img, thresholded, output;
 
@@ -342,6 +342,13 @@ Mat ThresholdImage(Mat original)
 {
 
 	Mat imgThresholded, imgHSV;
+
+    int iLowH = table->GetNumber("Low Hue");
+    int iHighH = table->GetNumber("High Hue");
+    int iLowS = table->GetNumber("Low Saturation");
+    int iHighS = table->GetNumber("High Saturation");
+    int iLowV = table->GetNumber("Low Value");
+    int iHighV = table->GetNumber("High Value");
 
     cvtColor(original, imgHSV, COLOR_BGR2HSV);
 
