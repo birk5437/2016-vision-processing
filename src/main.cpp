@@ -106,6 +106,8 @@ struct timespec autoStart, autoEnd;
 //Control process thread exectution
 bool progRun;
 
+std::shared_ptr<NetworkTable> table;
+
 int main(int argc, const char* argv[])
 {
 
@@ -119,14 +121,21 @@ int main(int argc, const char* argv[])
 	string networktables_ip;
 
 	if (params.Real_Robot) {
-		string networktables_ip = "10.36.18.79";
+		networktables_ip = "10.36.18.79";
 	} else {
-		string networktables_ip = "10.36.18.22";
+		networktables_ip = "10.36.18.22";
 	}
 
 	NetworkTable::SetIPAddress(networktables_ip); // where is the robot?
-	std::shared_ptr<NetworkTable> table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
+	table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
 
+    table->PutNumber("Low Hue", 50);
+    table->PutNumber("High Hue", 100);
+    table->PutNumber("Low Saturation" , 80);
+    table->PutNumber("High Saturation", 255);
+    table->PutNumber("Low Value", 60);
+    table->PutNumber("High Value", 255);
+    
 	cout << "Got through the network tables\n";
 
 	//start mjpeg stream thread
@@ -294,6 +303,7 @@ int main(int argc, const char* argv[])
 					}
 
 					imwrite("/var/local/natinst/www/capture.png", drawing);
+                    imwrite("/var/local/natinst/www/capture-src.png", img);
 				} else {
 					cout << "can't find contours" << endl;
 					int NO_CONTOURS = -1;
@@ -337,28 +347,18 @@ int main(int argc, const char* argv[])
 Mat ThresholdImage(Mat original)
 {
 
-	int iLowH = 50;
-	int iHighH = 100;
-
-	int iLowS = 80;
-	int iHighS = 255;
-
-	int iLowV = 60;
-	int iHighV = 255;
+	int iLowH = table->GetNumber("Low Hue");
+	int iHighH = table->GetNumber("High Hue");
+	int iLowS = table->GetNumber("Low Saturation");
+	int iHighS = table->GetNumber("High Saturation");
+	int iLowV = table->GetNumber("Low Value");
+	int iHighV = table->GetNumber("High Value");
 
 	Mat imgThresholded, imgHSV;
 
     cvtColor(original, imgHSV, COLOR_BGR2HSV);
 
     inRange(imgHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), imgThresholded); //Threshold the image
-
-    //morphological opening (remove small objects from the foreground)
-    erode(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    dilate(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-
-    //morphological closing (fill small holes in the foreground)
-    dilate(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    erode(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
 
 	//return image
 	return imgThresholded;
