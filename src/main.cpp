@@ -45,8 +45,7 @@ using namespace cv;
 using namespace std;
 
 //struct to define program execution variables passed in from the command line
-struct ProgParams
-{
+struct ProgParams {
 	string ROBOT_IP;
 	string ROBOT_PORT;
 	string CAMERA_IP;
@@ -101,13 +100,17 @@ Mat frame;
 
 //Global Timestamps for auto
 struct timespec autoStart, autoEnd;
-
+int iLowH;
+int iHighH;
+int iLowS;
+int iHighS;
+int iLowV;
+int iHighV;
 
 //Control process thread exectution
 bool progRun;
 std::shared_ptr<NetworkTable> table;
-int main(int argc, const char* argv[])
-{
+int main(int argc, const char* argv[]) {
 
 	//Read command line inputs to determine how the program will execute
 	ProgParams params;
@@ -130,12 +133,22 @@ int main(int argc, const char* argv[])
 	cout << "Got through the network tables\n";
 
 	//start mjpeg stream thread
-    table->PutNumber("Low Hue", 50);
-    table->PutNumber("High Hue", 100);
-    table->PutNumber("Low Saturation", 80);
-    table->PutNumber("High Saturation", 255);
-    table->PutNumber("Low Value", 60);
-    table->PutNumber("High Value", 255);
+	pthread_create(&MJPEG, NULL, VideoCap, &params);
+
+
+    iLowH = 50;
+    iHighH = 100;
+    iLowS = 80;
+    iHighS = 255;
+    iLowV = 60;
+    iHighV = 255;
+
+    table->PutNumber("Low Hue", iLowH);
+    table->PutNumber("High Hue", iHighH);
+    table->PutNumber("Low Saturation", iLowS);
+    table->PutNumber("High Saturation", iHighS);
+    table->PutNumber("Low Value", iLowV);
+    table->PutNumber("High Value", iHighV);
 	//Create Local Processing Image Variables
 	Mat img, thresholded, output;
 
@@ -145,19 +158,17 @@ int main(int argc, const char* argv[])
 	struct timespec start, end;
 
 	//run loop forever
-	while (true)
-	{
+	while (true) {
 		//check if program is allowed to run
 		//this bool, is enabled by the mjpeg thread
 		//once it is up to 10fps
 
-		if (params.Process && progRun)
-		{
+		if (params.Process && progRun) {
 			//start clock to determine our processing time;
 			clock_gettime(CLOCK_REALTIME, &start);
 
 			pthread_mutex_lock(&frameMutex);
-			if (!frame.empty()){
+			if (!frame.empty()) {
 				frame.copyTo(img);
 				pthread_mutex_unlock(&frameMutex);
 
@@ -338,36 +349,26 @@ int main(int argc, const char* argv[])
 }
 
 
-Mat ThresholdImage(Mat original)
-{
+Mat ThresholdImage(Mat original) {
 
 	Mat imgThresholded, imgHSV;
 
-    int iLowH = table->GetNumber("Low Hue");
-    int iHighH = table->GetNumber("High Hue");
-    int iLowS = table->GetNumber("Low Saturation");
-    int iHighS = table->GetNumber("High Saturation");
-    int iLowV = table->GetNumber("Low Value");
-    int iHighV = table->GetNumber("High Value");
+    iLowH = table->GetNumber("Low Hue", iLowH);
+    iHighH = table->GetNumber("High Hue", iHighH);
+    iLowS = table->GetNumber("Low Saturation", iLowS);
+    iHighS = table->GetNumber("High Saturation", iHighS);
+    iLowV = table->GetNumber("Low Value", iLowV);
+    iHighV = table->GetNumber("High Value", iHighV);
 
     cvtColor(original, imgHSV, COLOR_BGR2HSV);
 
     inRange(imgHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), imgThresholded); //Threshold the image
 
-    //morphological opening (remove small objects from the foreground)
-    erode(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    dilate(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-
-    //morphological closing (fill small holes in the foreground)
-    dilate(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-    erode(imgThresholded, imgThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
-
 	//return image
 	return imgThresholded;
 
 }
-void initializeParams(ProgParams& params)
-{
+void initializeParams(ProgParams& params) {
 	params.Debug = false;
 	params.From_Camera = false;
 	params.From_File = false;
@@ -383,90 +384,73 @@ void initializeParams(ProgParams& params)
  * the runtime parameters the program should use as specified
  * by the user.
  */
-void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
-{
+void parseCommandInputs(int argc, const char* argv[], ProgParams& params) {
 	//todo: define all input flags
-	if (argc < 2)
-	{ // Check the value of argc. If not enough parameters have been passed, inform user and exit.
+	if (argc < 2) { // Check the value of argc. If not enough parameters have been passed, inform user and exit.
 		printCommandLineUsage();
 		exit(0);
 	}
-	else
-	{ // if we got enough parameters...
+	else { // if we got enough parameters...
 
 		initializeParams(params);
 
-		for (int i = 1; i < argc; i++)
-		{ /* We will iterate over argv[] to get the parameters stored inside.
+		for (int i = 1; i < argc; i++) { /* We will iterate over argv[] to get the parameters stored inside.
 		 * Note that we're starting on 1 because we don't need to know the
 		 * path of the program, which is stored in argv[0] */
 
-			if ((string(argv[i]) == "-f") && (i + 1 < argc)) //read from file
-			{
+			if ((string(argv[i]) == "-f") && (i + 1 < argc)) {
 				// We know the next argument *should* be the filename:
 				params.IMAGE_FILE = string(argv[i + 1]);
 				params.From_Camera = false;
 				params.From_File = true;
 				i++;
 			}
-			else if ((string(argv[i]) == "-c") && (i + 1 < argc)) //camera IP
-			{
+			else if ((string(argv[i]) == "-c") && (i + 1 < argc)) {
 				params.CAMERA_IP = string(argv[i + 1]);
 				params.From_Camera = true;
 				params.From_File = false;
 				params.USB_Cam = false;
 				i++;
 			}
-			else if (string(argv[i]) == "-u") //use USB Camera
-			{
+			else if (string(argv[i]) == "-u") {
 				//params.CAMERA_IP = string(argv[i + 1]);
 				params.From_Camera = true;
 				params.From_File = false;
 				params.USB_Cam = true;
 			}
-			else if ((string(argv[i]) == "-s") && (i + 1 < argc)) //robot TCP SERVER IP
-			{
+			else if ((string(argv[i]) == "-s") && (i + 1 < argc)) {
 				params.ROBOT_IP = string(argv[i + 1]);
 				i++;
 			}
-			else if ((string(argv[i]) == "-p") && (i + 1 < argc)) //robot TCP SERVER PORT
-			{
+			else if ((string(argv[i]) == "-p") && (i + 1 < argc)) {
 				params.ROBOT_PORT = string(argv[i + 1]);
 				i++;
 			}
-			else if (string(argv[i]) == "-t") //Enable Timing
-			{
+			else if (string(argv[i]) == "-t") {
 				params.Timer = true;
 			}
-			else if (string(argv[i]) == "-np") //no processing
-			{
+			else if (string(argv[i]) == "-np") {
 				params.Process = false;
 			}
-			else if (string(argv[i]) == "-r") // Using competition robot
-			{
+			else if (string(argv[i]) == "-r") {
 				params.Real_Robot = true;
 			}
-			else if (string(argv[i]) == "-v") //Enable Visual output
-			{
+			else if (string(argv[i]) == "-v") {
 				params.Visualize = true;
 			}
-			else if (string(argv[i]) == "-debug") //Enable debug output
-			{
+			else if (string(argv[i]) == "-debug") {
 				params.Debug = true;
 			}
-			else if (string(argv[i]) == "-d") //Default Params
-			{
+			else if (string(argv[i]) == "-d") {
 				params.ROBOT_PORT = string(argv[i + 1]);
 				return;
 			}
-			else if (string(argv[i]) == "-help") //help
-			{
+			else if (string(argv[i]) == "-help") {
 				//todo: cout help on commands
 				printCommandLineUsage();
 				exit(0);
 			}
-			else
-			{
+			else {
 				std::cout
 						<< "Not enough or invalid arguments, please try again.\n";
 				printCommandLineUsage();
@@ -493,13 +477,11 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params)
  *
  * Only run the camera as 10FPS, with a 10kbs limit per frame
  */
-void *VideoCap(void *args)
-{
+void *VideoCap(void *args) {
 	//copy passed in variable to programStruct
 	ProgParams *struct_ptr = (ProgParams *) args;
 
-	if (struct_ptr->From_File)
-	{
+	if (struct_ptr->From_File) {
 		cout<<"Loading Image from file"<<endl;
 
 		//read img and store it in global variable
@@ -507,13 +489,11 @@ void *VideoCap(void *args)
 		frame = imread(struct_ptr->IMAGE_FILE);
 		pthread_mutex_unlock(&frameMutex);
 
-		if (!frame.empty())
-		{
+		if (!frame.empty()) {
 			cout<<"File Loaded: Starting Processing Thread"<<endl;
 			progRun = true;
 		}
-		else
-		{
+		else {
 			cout<<"Error Loading File"<<endl;
 			exit(0);
 		}
@@ -521,8 +501,7 @@ void *VideoCap(void *args)
 
 	}
 
-	else if(struct_ptr->From_Camera)
-	{
+	else if(struct_ptr->From_Camera) {
 		//create timer variables
 		struct timespec start, end, bufferStart, bufferEnd;
 
@@ -540,8 +519,7 @@ void *VideoCap(void *args)
 
 
 		std::string videoStreamAddress;
-		if (struct_ptr->USB_Cam)
-		{
+		if (struct_ptr->USB_Cam) {
 
 			int videoStreamAddress = 0; //represents /dev/video0
 
@@ -553,8 +531,7 @@ void *VideoCap(void *args)
 			//We specify desired frame size and fps in constructor
 			//Camera must be able to support specified framesize and frames per second
 			//or this will set camera to defaults
-			while (!vcap.open(videoStreamAddress, 320,240,7.5))
-			{
+			while (!vcap.open(videoStreamAddress, 320,240,7.5)) {
 				std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
 				count++;
 				usleep(1000000);
@@ -574,8 +551,7 @@ void *VideoCap(void *args)
 			cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
 
 		}
-		else //connect to IP Cam
-		{
+		else {
 			std::string videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
 
 			std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
@@ -584,8 +560,7 @@ void *VideoCap(void *args)
 
 			//open the video stream and make sure it's opened
 			//image settings, resolution and fps are set via axis camera webpage
-			while (!vcap.open(videoStreamAddress))
-			{
+			while (!vcap.open(videoStreamAddress)) {
 
 				std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
 				count++;
@@ -615,8 +590,7 @@ void *VideoCap(void *args)
 
 
 		//run in continuous loop
-		while (true)
-		{
+		while (true) {
 			//start timer to get time per frame
 			clock_gettime(CLOCK_REALTIME, &start);
 
@@ -641,8 +615,7 @@ void *VideoCap(void *args)
 			//buffer. We don't have a way to jump to the end of the stream to get the latest image, so we
 			//run this loop as fast as we can and throw away all the old images. This wait, waits some number of seconds
 			//before we are at the end of the stream, and can allow processing to begin.
-			if ((bufferDifference >= waitForBufferToClear) && !progRun)
-			{
+			if ((bufferDifference >= waitForBufferToClear) && !progRun) {
 				cout<<"Buffer Cleared: Starting Processing Thread"<<endl;
 				progRun = true;
 
@@ -659,8 +632,7 @@ void *VideoCap(void *args)
  * This function prints the command line usage of this
  * program to the std output
  */
-void printCommandLineUsage()
-{
+void printCommandLineUsage() {
 	cout<<"Usage: 2168_Vision  [Input]  [Options] \n\n";
 
 	cout<<setw(10)<<left<<"Inputs:  Choose Only 1"<<endl;
@@ -711,8 +683,7 @@ void printCommandLineUsage()
  * Error Functions
  * - Not Used -
  */
-void error(const char *msg)
-{
+void error(const char *msg) {
 	perror(msg);
 	exit(0);
 }
@@ -720,8 +691,7 @@ void error(const char *msg)
 /*
  * Calculate real clock difference
  */
-double diffClock(timespec start, timespec end)
-{
+double diffClock(timespec start, timespec end) {
  return	(end.tv_sec - start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec)/ 1000000000.0f;
 }
 
