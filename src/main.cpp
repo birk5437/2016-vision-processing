@@ -1,24 +1,3 @@
-/*
-
-Copyright (C) 2014  Kevin Harrilal, Control Engineer, Aluminum Falcon Robotics Inc.
-kevin@team2168.org
-
-Dec 31, 2014
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>
-
-*/
 #define _USE_MATH_DEFINES
 #define MIN_WIDTH 120
 #define Y_IMAGE_RES 240
@@ -46,19 +25,9 @@ using namespace std;
 
 //struct to define program execution variables passed in from the command line
 struct ProgParams {
-	string ROBOT_IP;
-	string ROBOT_PORT;
-	string CAMERA_IP;
-	string IMAGE_FILE;
-
-	bool From_Camera;
-	bool From_File;
-	bool Visualize;
-	bool Timer;
-	bool Debug;
-	bool Process;
-	bool USB_Cam;
-	bool Real_Robot;
+    bool Timer;
+    bool Debug;
+    bool Real_Robot;
 };
 
 //function declarations
@@ -68,38 +37,23 @@ void printCommandLineUsage();
 void initializeParams(ProgParams& params);
 double diffClock(timespec start, timespec end);
 Mat ThresholdImage(Mat img);
-void error(const char *msg);
 
 //Threaded Video Capture Function
 void *VideoCap(void *args);
-
-//GLOBAL CONSTANTS
-const double PI = 3.141592653589793;
-//Some common colors to draw with
-const Scalar RED = Scalar(0, 0, 255),
-			BLUE = Scalar(255, 0, 0),
-			GREEN = Scalar(0, 255, 0),
-			ORANGE = Scalar(0, 128, 255),
-			YELLOW = Scalar(0, 255, 255),
-			PINK = Scalar(255, 0,255),
-			WHITE = Scalar(255, 255, 255);
 
 //GLOBAL MUTEX LOCK VARIABLES
 pthread_mutex_t targetMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t matchStartMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t frameMutex = PTHREAD_MUTEX_INITIALIZER;
 
-
 //Thread Variables
 pthread_t MJPEG;
 pthread_t AutoCounter;
 
-
 //Store targets in global variable
 Mat frame;
 
-//Global Timestamps for auto
-struct timespec autoStart, autoEnd;
+//Thresholding variables
 int iLowH;
 int iHighH;
 int iLowS;
@@ -112,29 +66,28 @@ bool progRun;
 std::shared_ptr<NetworkTable> table;
 int main(int argc, const char* argv[]) {
 
-	//Read command line inputs to determine how the program will execute
-	ProgParams params;
-	parseCommandInputs(argc, argv, params);
+    //Read command line inputs to determine how the program will execute
+    ProgParams params;
+    parseCommandInputs(argc, argv, params);
 
-	// setup Network tables for this client to talk to the java code (same place this code is running!)
-	NetworkTable::SetClientMode();
+    // setup Network tables for this client to talk to the java code (same place this code is running!)
+    NetworkTable::SetClientMode();
 
-	string networktables_ip;
+    string networktables_ip;
 
-	if (params.Real_Robot) {
-		string networktables_ip = "10.36.18.79";
-	} else {
-		string networktables_ip = "10.36.18.22";
-	}
+    if (params.Real_Robot) {
+        string networktables_ip = "10.36.18.79";
+    } else {
+        string networktables_ip = "10.36.18.22";
+    }
 
-	NetworkTable::SetIPAddress(networktables_ip); // where is the robot?
-	 table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
+    NetworkTable::SetIPAddress(networktables_ip); // where is the robot?
+     table = NetworkTable::GetTable("SmartDashboard"); // what table will we interface with?
 
-	cout << "Got through the network tables\n";
+    cout << "Got through the network tables\n";
 
-	//start mjpeg stream thread
-	pthread_create(&MJPEG, NULL, VideoCap, &params);
-
+    //start mjpeg stream thread
+    pthread_create(&MJPEG, NULL, VideoCap, &params);
 
     iLowH = 50;
     iHighH = 100;
@@ -149,209 +102,197 @@ int main(int argc, const char* argv[]) {
     table->PutNumber("High Saturation", iHighS);
     table->PutNumber("Low Value", iLowV);
     table->PutNumber("High Value", iHighV);
-	//Create Local Processing Image Variables
-	Mat img, thresholded, output;
+    //Create Local Processing Image Variables
+    Mat img, thresholded, output;
 
-	//initialize variables so processing loop is false;
-	progRun = false;
+    //initialize variables so processing loop is false;
+    progRun = false;
 
-	struct timespec start, end;
+    struct timespec start, end;
 
-	//run loop forever
-	while (true) {
-		//check if program is allowed to run
-		//this bool, is enabled by the mjpeg thread
-		//once it is up to 10fps
+    //run loop forever
+    while (true) {
+        //check if program is allowed to run
+        //this bool, is enabled by the mjpeg thread
+        //once it is up to 10fps
 
-		if (params.Process && progRun) {
-			//start clock to determine our processing time;
-			clock_gettime(CLOCK_REALTIME, &start);
+        if (progRun) {
+            //start clock to determine our processing time;
+            clock_gettime(CLOCK_REALTIME, &start);
 
-			pthread_mutex_lock(&frameMutex);
-			if (!frame.empty()) {
-				frame.copyTo(img);
-				pthread_mutex_unlock(&frameMutex);
+            pthread_mutex_lock(&frameMutex);
+            if (!frame.empty()) {
+                frame.copyTo(img);
+                pthread_mutex_unlock(&frameMutex);
 
-				thresholded = ThresholdImage(img);
+                thresholded = ThresholdImage(img);
 
-				imwrite("/var/local/natinst/www/capture-src.png", img);
+                imwrite("/var/local/natinst/www/capture-src.png", img);
 
-				vector < vector<Point> > contours;
-				vector<Vec4i> hierarchy;
+                vector < vector<Point> > contours;
+                vector<Vec4i> hierarchy;
 
+                findContours(thresholded, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-				findContours(thresholded, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+                if (contours.size() > 0) {
 
+                    cout << contours.size() << " contours" << endl;
 
-				if (contours.size() > 0) {
+                    vector <Point> targetContour = contours[0];
 
-					cout << contours.size() << " contours" << endl;
+                    for (unsigned int i = 1; i < contours.size(); i++) {
+                        if (contourArea(contours[i]) > contourArea(targetContour)) {
+                            targetContour = contours[i];
+                        }
+                    }
 
-					vector <Point> targetContour = contours[0];
+                    Mat drawing = Mat::zeros( thresholded.size(), CV_8UC3 );
+                    Scalar color = Scalar( 255, 255, 255);
 
-					for (unsigned int i = 1; i < contours.size(); i++) {
-						if (contourArea(contours[i]) > contourArea(targetContour)) {
-							targetContour = contours[i];
-						}
-					}
+                    vector <Point> hull;
 
-					Mat drawing = Mat::zeros( thresholded.size(), CV_8UC3 );
-					Scalar color = Scalar( 255, 255, 255);
+                    convexHull(targetContour, hull, false);
 
-					vector <Point> hull;
+                    vector <vector <Point> > tmpHull(1, hull);
 
-					convexHull(targetContour, hull, false);
+                    cout << "hull size " << hull.size() << endl;
 
-					vector <vector <Point> > tmpHull(1, hull);
+                    vector <Point> corners(4, Point(0,0));
+                    vector <int>  cornerSq(4);
+                    int TOP_LEFT = 0;
+                    int TOP_RIGHT = 1;
+                    int BOTTOM_RIGHT = 2;
+                    int BOTTOM_LEFT = 3;
 
+                    for (unsigned int i = 0; i < corners.size(); i++) {
+                        corners[i] = hull[0];
+                        if (i < 2)
+                          cornerSq[i] = hull[0].x * hull[0].y;
+                        else
+                          cornerSq[i] = (img.cols - hull[0].x) * hull[0].y;
+                    }
 
-					cout << "hull size " << hull.size() << endl;
+                    for (unsigned int i = 1; i < hull.size(); i++) {
 
+                        cout << "hull " << i << ": (" << hull[i].x << ", " << hull[i].y << ") ";
+                        int thisSq = hull[i].x * hull[i].y;
 
-					vector <Point> corners(4, Point(0,0));
-					vector <int>  cornerSq(4);
-					int TOP_LEFT = 0;
-					int TOP_RIGHT = 1;
-					int BOTTOM_RIGHT = 2;
-					int BOTTOM_LEFT = 3;
+                        if (thisSq < cornerSq[TOP_LEFT]) {
+                            corners[TOP_LEFT] = hull[i];
+                            cornerSq[TOP_LEFT] = thisSq;
+                        }
+                        if (thisSq > cornerSq[BOTTOM_RIGHT]) {
+                            corners[BOTTOM_RIGHT] = hull[i];
+                            cornerSq[BOTTOM_RIGHT] = thisSq;
+                        }
 
-					for (unsigned int i = 0; i < corners.size(); i++) {
-						corners[i] = hull[0];
-						if (i < 2)
-						  cornerSq[i] = hull[0].x * hull[0].y;
-						else
-						  cornerSq[i] = (img.cols - hull[0].x) * hull[0].y;
-					}
+                        thisSq = (img.cols - hull[i].x) * hull[i].y;
 
-					for (unsigned int i = 1; i < hull.size(); i++) {
+                        if (thisSq < cornerSq[TOP_RIGHT]) {
+                            corners[TOP_RIGHT] = hull[i];
+                            cornerSq[TOP_RIGHT] = thisSq;
+                        }
+                        if (thisSq > cornerSq[BOTTOM_LEFT]) {
+                            corners[BOTTOM_LEFT] = hull[i];
+                            cornerSq[BOTTOM_LEFT] = thisSq;
+                        }
+                    }
 
-						cout << "hull " << i << ": (" << hull[i].x << ", " << hull[i].y << ") ";
-						int thisSq = hull[i].x * hull[i].y;
+                    cout << endl;
 
-						if (thisSq < cornerSq[TOP_LEFT]) {
-							corners[TOP_LEFT] = hull[i];
-							cornerSq[TOP_LEFT] = thisSq;
-						}
-						if (thisSq > cornerSq[BOTTOM_RIGHT]) {
-							corners[BOTTOM_RIGHT] = hull[i];
-							cornerSq[BOTTOM_RIGHT] = thisSq;
-						}
+                    for (unsigned int i = 0; i < corners.size(); i++) {
+                        circle(drawing, corners[i], 4, Scalar(0, 0, 255), 1, 8, 0);
+                    }
 
-						thisSq = (img.cols - hull[i].x) * hull[i].y;
+                    //Easier equations that will average out the points
+                    double cenX1 = fabs(((double)(corners[TOP_RIGHT].x - corners[TOP_LEFT].x)) / 2);
+                    double cenX2 = fabs(((double)(corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x)) / 2);
+                    double cenX = ((double) (cenX1 + cenX2) / 2) + corners[TOP_LEFT].x;
 
-						if (thisSq < cornerSq[TOP_RIGHT]) {
-							corners[TOP_RIGHT] = hull[i];
-							cornerSq[TOP_RIGHT] = thisSq;
-						}
-						if (thisSq > cornerSq[BOTTOM_LEFT]) {
-							corners[BOTTOM_LEFT] = hull[i];
-							cornerSq[BOTTOM_LEFT] = thisSq;
-						}
-					}
+                    double cenY1 = fabs(((double)(corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y)) / 2);
+                    double cenY2 = fabs(((double)(corners[TOP_LEFT].y - corners[BOTTOM_LEFT].y)) / 2);
+                    double cenY = ((double) (cenY1 + cenY2) / 2) + corners[TOP_LEFT].y;
 
-					cout << endl;
+                    //Code to calculate area, and eliminate the smallest contours
 
+                    double wx1 = corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x;
+                    double wy1 = corners[BOTTOM_RIGHT].y - corners[BOTTOM_LEFT].y;
 
-					for (unsigned int i = 0; i < corners.size(); i++) {
-						circle(drawing, corners[i], 4, Scalar(0, 0, 255), 1, 8, 0);
-					}
+                    double hx1 = corners[TOP_RIGHT].x - corners[BOTTOM_RIGHT].x;
+                    double hy1 = corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y;
 
-					//Easier equations that will average out the points
-					double cenX1 = fabs(((double)(corners[TOP_RIGHT].x - corners[TOP_LEFT].x)) / 2);
-					double cenX2 = fabs(((double)(corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x)) / 2);
-					double cenX = ((double) (cenX1 + cenX2) / 2) + corners[TOP_LEFT].x;
+                    double wx2 = pow(wx1, 2);
+                    double wy2 = pow(wy1, 2);
 
-					double cenY1 = fabs(((double)(corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y)) / 2);
-					double cenY2 = fabs(((double)(corners[TOP_LEFT].y - corners[BOTTOM_LEFT].y)) / 2);
-					double cenY = ((double) (cenY1 + cenY2) / 2) + corners[TOP_LEFT].y;
+                    double hx2 = pow(hx1, 2);
+                    double hy2 = pow(hy1, 2);
 
-					//Code to calculate area, and eliminate the smallest contours
+                    double dist1 = sqrt(wx2 + wy2);
+                    double dist2 = sqrt(hx2 + hy2);
 
-					double wx1 = corners[BOTTOM_RIGHT].x - corners[BOTTOM_LEFT].x;
-					double wy1 = corners[BOTTOM_RIGHT].y - corners[BOTTOM_LEFT].y;
+                    double area = dist1 * dist2;
 
-					double hx1 = corners[TOP_RIGHT].x - corners[BOTTOM_RIGHT].x;
-					double hy1 = corners[TOP_RIGHT].y - corners[BOTTOM_RIGHT].y;
+                    cout << "Area: " << area << endl;
 
-					double wx2 = pow(wx1, 2);
-					double wy2 = pow(wy1, 2);
+                    if (area < 99) {
+                        // Do something here
+                    }
 
-					double hx2 = pow(hx1, 2);
-					double hy2 = pow(hy1, 2);
+                    table->PutNumber("Goal Width", dist1);
 
-					double dist1 = sqrt(wx2 + wy2);
-					double dist2 = sqrt(hx2 + hy2);
+                    table->PutNumber("Center X", cenX);
+                    table->PutNumber("Center Y", cenY);
 
-					double area = dist1 * dist2;
+                    drawContours(drawing, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
+                    circle(drawing, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
+                    line(drawing, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
+                    line(drawing, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
 
-					cout << "Area: " << area << endl;
+                    drawContours(img, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
+                    circle(img, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
+                    line(img, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
+                    line(img, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
+                    for (unsigned int i = 0; i < 4; i++) {
+                        circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
+                    }
 
-					if (area < 99) {
-						// Do something here
-					}
+                    imwrite("/var/local/natinst/www/capture.png", drawing);
+                } else {
+                    cout << "can't find contours" << endl;
+                    int NO_CONTOURS = -1;
+                    table->PutNumber("Center X", NO_CONTOURS);
+                    table->PutNumber("Center Y", NO_CONTOURS);
+                }
 
-					table->PutNumber("Goal Width", dist1);
+                imwrite("/var/local/natinst/www/capture-test.png", img);
 
-					table->PutNumber("Center X", cenX);
-					table->PutNumber("Center Y", cenY);
+                pthread_mutex_lock(&targetMutex);
+                pthread_mutex_unlock(&targetMutex);
 
-					drawContours(drawing, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
-					circle(drawing, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
-					line(drawing, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
-					line(drawing, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
+                clock_gettime(CLOCK_REALTIME, &end);
 
-					drawContours(img, tmpHull, 0, color, 1, 8, hierarchy, 0, Point(0, 0) );
-					circle(img, Point(((int) round(cenX)), ((int) round(cenY))), 4, Scalar(0, 255, 0), 1, 8, 0);
-					line(img, corners[TOP_LEFT], corners[BOTTOM_RIGHT], Scalar(255, 0, 0), 1, 8, 0);
-					line(img, corners[TOP_RIGHT], corners[BOTTOM_LEFT], Scalar(255, 0, 0), 1, 8, 0);
-					for (unsigned int i = 0; i < 4; i++) {
-						circle(img, Point(((int) round(cenX)), ((int) round(cenY) - 75 - (25 * i))), 4, Scalar(0, 0, 255), 1, 8, 0);
-					}
+                cout << "It took " << diffClock(start,end) << " seconds to process frame \n";
 
-					imwrite("/var/local/natinst/www/capture.png", drawing);
-				} else {
-					cout << "can't find contours" << endl;
-					int NO_CONTOURS = -1;
-					table->PutNumber("Center X", NO_CONTOURS);
-					table->PutNumber("Center Y", NO_CONTOURS);
-				}
+            }
 
-				imwrite("/var/local/natinst/www/capture-test.png", img);
+            pthread_mutex_unlock(&frameMutex);
 
+        }
 
-				pthread_mutex_lock(&targetMutex);
-				pthread_mutex_unlock(&targetMutex);
+        usleep(1000); //20000 sleep for 5ms); // run 40 times a second
+    }
 
-				clock_gettime(CLOCK_REALTIME, &end);
+    //if we end the process code, wait for threads to end
+    pthread_join(MJPEG, NULL);
 
-				if(params.Timer)
-					cout << "It took " << diffClock(start,end) << " seconds to process frame \n";
-
-
-			}
-
-			pthread_mutex_unlock(&frameMutex);
-
-			if(params.Visualize)
-				waitKey(5);
-
-		}
-
-		usleep(1000); //20000 sleep for 5ms); // run 40 times a second
-	}
-
-	//if we end the process code, wait for threads to end
-	pthread_join(MJPEG, NULL);
-
-	//done
-	return 0;
+    //done
+    return 0;
 
 }
 
-
 Mat ThresholdImage(Mat original) {
 
-	Mat imgThresholded, imgHSV;
+    Mat imgThresholded, imgHSV;
 
     iLowH = table->GetNumber("Low Hue", iLowH);
     iHighH = table->GetNumber("High Hue", iHighH);
@@ -364,19 +305,14 @@ Mat ThresholdImage(Mat original) {
 
     inRange(imgHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), imgThresholded); //Threshold the image
 
-	//return image
-	return imgThresholded;
+    //return image
+    return imgThresholded;
 
 }
 void initializeParams(ProgParams& params) {
-	params.Debug = false;
-	params.From_Camera = false;
-	params.From_File = false;
-	params.Timer = false;
-	params.Visualize = false;
-	params.Process = true;
-	params.USB_Cam = false;
-	params.Real_Robot = false;
+    params.Debug = false;
+    params.Timer = true;
+    params.Real_Robot = false;
 }
 
 /**
@@ -385,83 +321,24 @@ void initializeParams(ProgParams& params) {
  * by the user.
  */
 void parseCommandInputs(int argc, const char* argv[], ProgParams& params) {
-	//todo: define all input flags
-	if (argc < 2) { // Check the value of argc. If not enough parameters have been passed, inform user and exit.
-		printCommandLineUsage();
-		exit(0);
-	}
-	else { // if we got enough parameters...
+    //todo: define all input flags
 
-		initializeParams(params);
+    initializeParams(params);
 
-		for (int i = 1; i < argc; i++) { /* We will iterate over argv[] to get the parameters stored inside.
-		 * Note that we're starting on 1 because we don't need to know the
-		 * path of the program, which is stored in argv[0] */
-
-			if ((string(argv[i]) == "-f") && (i + 1 < argc)) {
-				// We know the next argument *should* be the filename:
-				params.IMAGE_FILE = string(argv[i + 1]);
-				params.From_Camera = false;
-				params.From_File = true;
-				i++;
-			}
-			else if ((string(argv[i]) == "-c") && (i + 1 < argc)) {
-				params.CAMERA_IP = string(argv[i + 1]);
-				params.From_Camera = true;
-				params.From_File = false;
-				params.USB_Cam = false;
-				i++;
-			}
-			else if (string(argv[i]) == "-u") {
-				//params.CAMERA_IP = string(argv[i + 1]);
-				params.From_Camera = true;
-				params.From_File = false;
-				params.USB_Cam = true;
-			}
-			else if ((string(argv[i]) == "-s") && (i + 1 < argc)) {
-				params.ROBOT_IP = string(argv[i + 1]);
-				i++;
-			}
-			else if ((string(argv[i]) == "-p") && (i + 1 < argc)) {
-				params.ROBOT_PORT = string(argv[i + 1]);
-				i++;
-			}
-			else if (string(argv[i]) == "-t") {
-				params.Timer = true;
-			}
-			else if (string(argv[i]) == "-np") {
-				params.Process = false;
-			}
-			else if (string(argv[i]) == "-r") {
-				params.Real_Robot = true;
-			}
-			else if (string(argv[i]) == "-v") {
-				params.Visualize = true;
-			}
-			else if (string(argv[i]) == "-debug") {
-				params.Debug = true;
-			}
-			else if (string(argv[i]) == "-d") {
-				params.ROBOT_PORT = string(argv[i + 1]);
-				return;
-			}
-			else if (string(argv[i]) == "-help") {
-				//todo: cout help on commands
-				printCommandLineUsage();
-				exit(0);
-			}
-			else {
-				std::cout
-						<< "Not enough or invalid arguments, please try again.\n";
-				printCommandLineUsage();
-				exit(0);
-			}
-
-		}
-
-	}
+    for (int i = 1; i < argc; i++) {
+        if (string(argv[i]) == "-t") {
+            params.Timer = false;
+        }
+        else if (string(argv[i]) == "-d") {
+            params.Debug = true;
+        }
+        else if (string(argv[i]) == "--help" || string(argv[i]) == "-h") {
+            //todo: cout help on commands
+            printCommandLineUsage();
+            exit(0);
+        }
+    }
 }
-
 
 /**
  * This function uses FFMPEG codec apart of openCV to open a
@@ -478,154 +355,103 @@ void parseCommandInputs(int argc, const char* argv[], ProgParams& params) {
  * Only run the camera as 10FPS, with a 10kbs limit per frame
  */
 void *VideoCap(void *args) {
-	//copy passed in variable to programStruct
-	ProgParams *struct_ptr = (ProgParams *) args;
+    //copy passed in variable to programStruct
+    ProgParams *struct_ptr = (ProgParams *) args;
 
-	if (struct_ptr->From_File) {
-		cout<<"Loading Image from file"<<endl;
+    //create timer variables
+    struct timespec start, end, bufferStart, bufferEnd;
 
-		//read img and store it in global variable
-		pthread_mutex_lock(&frameMutex);
-		frame = imread(struct_ptr->IMAGE_FILE);
-		pthread_mutex_unlock(&frameMutex);
+    //seconds to wait for buffer to clear before we start main process thread
+    int waitForBufferToClear = 12;
 
-		if (!frame.empty()) {
-			cout<<"File Loaded: Starting Processing Thread"<<endl;
-			progRun = true;
-		}
-		else {
-			cout<<"Error Loading File"<<endl;
-			exit(0);
-		}
+    //start timer to time how long it takes to open stream
+    clock_gettime(CLOCK_REALTIME, &start);
 
+    cv::VideoCapture vcap;
 
-	}
+    int videoStreamAddress = 0; //represents /dev/video0
 
-	else if(struct_ptr->From_Camera) {
-		//create timer variables
-		struct timespec start, end, bufferStart, bufferEnd;
+    std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
 
-		//seconds to wait for buffer to clear before we start main process thread
-		int waitForBufferToClear = 12;
+    int count = 1;
 
-		//start timer to time how long it takes to open stream
-		clock_gettime(CLOCK_REALTIME, &start);
+    //open the video stream and make sure it's opened
+    //We specify desired frame size and fps in constructor
+    //Camera must be able to support specified framesize and frames per second
+    //or this will set camera to defaults
+    while (!vcap.open(videoStreamAddress, 320,240,7.5)) {
+        std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
+        count++;
+        usleep(1000000);
+    }
 
-		cv::VideoCapture vcap;
+    //After Opening Camera we need to configure the returned image setting
+    //all opencv v4l2 camera controls scale from 0.0 - 1.0
 
+    //vcap.set(CV_CAP_PROP_EXPOSURE_AUTO, 1);
+    vcap.set(CV_CAP_PROP_EXPOSURE_ABSOLUTE, 0.1);
+    vcap.set(CV_CAP_PROP_BRIGHTNESS, 1);
+    vcap.set(CV_CAP_PROP_CONTRAST, 0);
+    vcap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+    vcap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
-		// For IP cam this works on a AXIS M1013
-		// For USB cam this works on Microsoft HD 3000
+    cout<<vcap.get(CV_CAP_PROP_FRAME_WIDTH)<<endl;
+    cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
 
+    //Stream started
+    cout << "Successfully connected to Camera Stream" << std::endl;
 
-		std::string videoStreamAddress;
-		if (struct_ptr->USB_Cam) {
+    //set true boolean
+    pthread_mutex_lock(&targetMutex);
+    pthread_mutex_unlock(&targetMutex);
 
-			int videoStreamAddress = 0; //represents /dev/video0
+    //end clock to determine time to setup stream
+    clock_gettime(CLOCK_REALTIME, &end);
 
-			std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
+    cout << "It took " << diffClock(start,end) << " seconds to set up stream " << endl;
 
-			int count =1;
+    clock_gettime(CLOCK_REALTIME, &bufferStart);
 
-			//open the video stream and make sure it's opened
-			//We specify desired frame size and fps in constructor
-			//Camera must be able to support specified framesize and frames per second
-			//or this will set camera to defaults
-			while (!vcap.open(videoStreamAddress, 320,240,7.5)) {
-				std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
-				count++;
-				usleep(1000000);
-			}
+    cout<<"Waiting for stream buffer to clear..."<<endl;
 
-			//After Opening Camera we need to configure the returned image setting
-			//all opencv v4l2 camera controls scale from 0.0 - 1.0
+    int frames = 0;
+    //run in continuous loop
+    while (true) {
+        //start timer to get time per frame
+        clock_gettime(CLOCK_REALTIME, &start);
 
-			//vcap.set(CV_CAP_PROP_EXPOSURE_AUTO, 1);
-			vcap.set(CV_CAP_PROP_EXPOSURE_ABSOLUTE, 0.1);
-			vcap.set(CV_CAP_PROP_BRIGHTNESS, 1);
-			vcap.set(CV_CAP_PROP_CONTRAST, 0);
-			vcap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-			vcap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+        //read frame and store it in global variable
+        pthread_mutex_lock(&frameMutex);
+        vcap.read(frame);
+        pthread_mutex_unlock(&frameMutex);
 
-			cout<<vcap.get(CV_CAP_PROP_FRAME_WIDTH)<<endl;
-			cout<<vcap.get(CV_CAP_PROP_FRAME_HEIGHT)<<endl;
+        //end timer to get time per frame
+        clock_gettime(CLOCK_REALTIME, &end);
 
-		}
-		else {
-			std::string videoStreamAddress = "http://" + struct_ptr->CAMERA_IP +"/mjpg/video.mjpg";
+        frames++;
 
-			std::cout<<"Trying to connect to Camera stream... at: "<<videoStreamAddress<<std::endl;
+        if(struct_ptr->Timer) {
+            cout << "It took FFMPEG " << diffClock(start,end) << " seconds to grab stream \n";
+            if (diffClock(start, end) >= 1.0) {
+               cout << "fps: " << frames;
+               table->PutNumber("fps", frames); 
+               frames = 0;
+            }
+        }
+        //end timer to get time since stream started
+        clock_gettime(CLOCK_REALTIME, &bufferEnd);
+        double bufferDifference = diffClock(bufferStart, bufferEnd);
 
-			int count = 1;
-
-			//open the video stream and make sure it's opened
-			//image settings, resolution and fps are set via axis camera webpage
-			while (!vcap.open(videoStreamAddress)) {
-
-				std::cout << "Error connecting to camera stream, retrying " << count<< std::endl;
-				count++;
-				usleep(1000000);
-			}
-
-		}
-
-
-
-		//Stream started
-		cout << "Successfully connected to Camera Stream" << std::endl;
-
-		//set true boolean
-		pthread_mutex_lock(&targetMutex);
-		pthread_mutex_unlock(&targetMutex);
-
-		//end clock to determine time to setup stream
-		clock_gettime(CLOCK_REALTIME, &end);
-
-		cout << "It took " << diffClock(start,end) << " seconds to set up stream " << endl;
-
-		clock_gettime(CLOCK_REALTIME, &bufferStart);
-
-
-		cout<<"Waiting for stream buffer to clear..."<<endl;
-
-
-		//run in continuous loop
-		while (true) {
-			//start timer to get time per frame
-			clock_gettime(CLOCK_REALTIME, &start);
-
-			//read frame and store it in global variable
-			pthread_mutex_lock(&frameMutex);
-			vcap.read(frame);
-			pthread_mutex_unlock(&frameMutex);
-
-			//end timer to get time per frame
-			clock_gettime(CLOCK_REALTIME, &end);
-
-
-			if(struct_ptr->Timer)
-				cout << "It took FFMPEG " << diffClock(start,end) << " seconds to grab stream \n";
-
-
-			//end timer to get time since stream started
-			clock_gettime(CLOCK_REALTIME, &bufferEnd);
-			double bufferDifference = diffClock(bufferStart, bufferEnd);
-
-			//The stream takes a while to start up, and because of it, images from the camera
-			//buffer. We don't have a way to jump to the end of the stream to get the latest image, so we
-			//run this loop as fast as we can and throw away all the old images. This wait, waits some number of seconds
-			//before we are at the end of the stream, and can allow processing to begin.
-			if ((bufferDifference >= waitForBufferToClear) && !progRun) {
-				cout<<"Buffer Cleared: Starting Processing Thread"<<endl;
-				progRun = true;
-
-			}
-			usleep(1000); //sleep for 5ms
-		}
-
-	}
-
-	return NULL;
+        //The stream takes a while to start up, and because of it, images from the camera
+        //buffer. We don't have a way to jump to the end of the stream to get the latest image, so we
+        //run this loop as fast as we can and throw away all the old images. This wait, waits some number of seconds
+        //before we are at the end of the stream, and can allow processing to begin.
+        if ((bufferDifference >= waitForBufferToClear) && !progRun) {
+            cout<<"Buffer Cleared: Starting Processing Thread"<<endl;
+            progRun = true;
+        }
+    }
+    return NULL;
 }
 
 /*
@@ -633,67 +459,24 @@ void *VideoCap(void *args) {
  * program to the std output
  */
 void printCommandLineUsage() {
-	cout<<"Usage: 2168_Vision  [Input]  [Options] \n\n";
+    cout<<"Usage: 2168_Vision  [Input]  [Options] \n\n";
 
-	cout<<setw(10)<<left<<"Inputs:  Choose Only 1"<<endl;
+    cout<<setw(10)<<left<<"";
+    cout<<setw(20)<<left<<"-t";
+    cout<<"Disable Timing Print Outs"<<endl;
 
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-f <file location>";
-	cout<<"Process image at <file location>"<<endl;
-	cout<<setw(30)<<""<<"ex: -f /home/image.jpg"<<endl;
+    cout<<setw(10)<<left<<"";
+    cout<<setw(20)<<left<<"-d";
+    cout<<"Enable Debug Print Outs"<<endl;
 
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-c <ip address>";
-	cout<<"Use IP camera at <ip address>"<<endl;
-	cout<<setw(30)<<""<<"ex: -c 10.21.68.2"<<endl;
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-u";
-	cout<<"Use USB cam at /dev/video0"<<endl;
-
-	cout<<endl<<endl;
-	cout<<setw(10)<<left<<"Options:  Choose Any Combination"<<endl;
-
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-t";
-	cout<<"Enable Timing Print Outs"<<endl;
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-v";
-	cout<<"Enable Visual Output"<<endl;
-	cout<<setw(30)<<""<<"Uses X11 forwarding to show processed image"<<endl;
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-np";
-	cout<<"No Processing: Disable Processing Thread"<<endl;
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-debug";
-	cout<<"Enable Debug Print Outs"<<endl;
-
-	cout<<setw(10)<<left<<"";
-	cout<<setw(20)<<left<<"-help";
-	cout<<"Prints this menu"<<endl;
-
-
-}
-
-/*
- * Error Functions
- * - Not Used -
- */
-void error(const char *msg) {
-	perror(msg);
-	exit(0);
+    cout<<setw(10)<<left<<"";
+    cout<<setw(20)<<left<<"-h,\t--help";
+    cout<<"Prints this menu"<<endl;
 }
 
 /*
  * Calculate real clock difference
  */
 double diffClock(timespec start, timespec end) {
- return	(end.tv_sec - start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec)/ 1000000000.0f;
+ return (end.tv_sec - start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec)/ 1000000000.0f;
 }
-
-
-
