@@ -4,6 +4,7 @@
 #define VIEW_ANGLE 34.8665269
 #define AUTO_STEADY_STATE 1.9 //seconds
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <cmath>
