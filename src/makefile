@@ -20,4 +20,3 @@ $(OBJECTS): $(SOURCES)
 
 clean:
 	rm ../build/*
-
