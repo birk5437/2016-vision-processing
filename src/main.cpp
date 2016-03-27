@@ -1,3 +1,10 @@
+#define _USE_MATH_DEFINES
+#define MIN_WIDTH 120
+#define Y_IMAGE_RES 240
+#define VIEW_ANGLE 34.8665269
+#define AUTO_STEADY_STATE 1.9 //seconds
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <cmath>
